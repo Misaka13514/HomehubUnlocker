@@ -1,0 +1,13 @@
+# Build artifacts
+build/
+*.apk
+*.apk.idsig
+
+# Signing keys
+*.jks
+*.keystore
+
+# IDE / OS
+.DS_Store
+.idea/
+*.iml
