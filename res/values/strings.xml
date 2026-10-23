@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HomehubUnlocker</string>
-    <string name="xposed_description">Reveal the registration menus hidden by server-issued contract flags in BITKEY homehub (passcode / NFC card settings).</string>
+    <string name="xposed_description">Reveal the registration menus (passcode / NFC card settings) and the entry/exit history tab hidden by server-issued contract flags in BITKEY homehub.</string>
 </resources>

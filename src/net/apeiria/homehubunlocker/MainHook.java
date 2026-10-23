@@ -13,9 +13,11 @@ import java.lang.reflect.Method;
  * The home management company can issue "sub-owner" contracts that clear the
  * canNfcSetting / canPasscodeSetting flags, which hides the passcode and NFC
  * card registration menus in the app even though the device itself accepts
- * them. This module NOPs the guard branch of those permission getters inside
- * the Dart AOT image (libapp.so) so they return true via the app's own
- * fail-open path, revealing the hidden menus.
+ * them. The same contract family also hides the 出入り履歴 (entry/exit history)
+ * tab on the lock detail page via LockDevice.canShowLog, although the logs
+ * endpoint answers sub-owner tokens regardless. This module NOPs the guard
+ * branches of those checks inside the Dart AOT image (libapp.so) so they
+ * return true via the app's own fail-open path, revealing the hidden UI.
  */
 public final class MainHook implements IXposedHookLoadPackage {
 
@@ -134,7 +136,8 @@ public final class MainHook implements IXposedHookLoadPackage {
                     int top = (word >>> 24) & 0xff;
                     // cbz/cbnz/tbz/tbnz, 32/64 bit — sanity-check that the
                     // configured offset really points at a guard branch.
-                    if (top != 0x34 && top != 0x35 && top != 0xB4 && top != 0xB5) {
+                    if (top != 0x34 && top != 0x35 && top != 0xB4 && top != 0xB5
+                            && top != 0x36 && top != 0x37 && top != 0xB6 && top != 0xB7) {
                         log("0x" + Long.toHexString(vaddr) + " skipped: word 0x"
                                 + Integer.toHexString(word) + " is not a guard branch");
                         continue;

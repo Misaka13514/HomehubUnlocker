@@ -2,7 +2,8 @@
 
 An [LSPosed](https://github.com/LSPosed/LSPosed) module for the BITKEY homehub
 Android app (`app.jp.co.bitkey.homehub`) that reveals the passcode and NFC card
-registration menus hidden by server-issued contract flags.
+registration menus and the entry/exit history tab hidden by server-issued
+contract flags.
 
 ## Background
 
@@ -28,6 +29,13 @@ true. For a tenant with a *subowner* contract the server sends
 though the registration endpoints and the device firmware accept the
 operations regardless (the flags gate the UI only; verified on 3.35.3, see
 CONTRIBUTING.md).
+
+A second, independent gate hides the entry/exit history tab on
+the lock device detail page: `_DeviceTabsHelper.showLogTab` asks
+`LockDevice.canShowLog`, which for subowner devices requires the server-issued
+`passportAuthorities` list to contain `showDeviceLog`. Again the flag gates
+the UI only — `GET /homehubDevice/v1/devices/{id}/logs` returns the full
+history to a subowner token (verified on 3.35.3).
 
 The flags are evaluated in the Dart AOT image (`libapp.so`) of the Flutter
 app, so no Java-level hook can reach them. This module patches the machine
@@ -80,19 +88,29 @@ matter when choosing *which* `cbnz` to NOP:
   the *second* check's fall-through is directly `true` → patch the second one
   (`0x754474`). Every non-empty-contract execution passes through it.
 
-With the built-in offset table exactly two instructions are patched (homehub
-3.35.3, arm64; both words are `0x35000060`, i.e. `cbnz w0, #+0xc`):
+With the built-in offset table three instructions are patched (homehub
+3.35.3, arm64; the two menu guards are `0x35000060` = `cbnz w0, #+0xc`, the
+tab guard is `0x37201e20` = `tbnz w0, #4, #+0x3c4`):
 
-| getter              | function vaddr | guard cbnz vaddr |
-|---------------------|----------------|------------------|
-| `canNfcSetting`     | `0x74f7dc`     | `0x74f824`       |
-| `canPasscodeSetting`| `0x754358`     | `0x754474`       |
+| site                              | function              | guard branch vaddr |
+|-----------------------------------|-----------------------|--------------------|
+| `canNfcSetting`                   | `0x74f7dc`            | `0x74f824` (cbnz)  |
+| `canPasscodeSetting`              | `0x754358`            | `0x754474` (cbnz)  |
+| log tab (`DeviceDetailView.build`, right after the `showLogTab()` call) | — | `0xc82a9c` (tbnz) |
 
-The structural scanner used for unknown versions matches this whole getter
-shape, so on 3.35.3 it finds a third site of the same family
+The tab guard tests the compressed boolean returned by `showLogTab()` and
+skips appending the tab when it is false; NOP-ing it always appends the tab,
+and the tab's own view model then simply GETs the logs endpoint (which, as
+noted above, the server does not actually restrict). Before writing, the
+patcher sanity-checks that each configured vaddr holds a guard branch
+(`cbz`/`cbnz`/`tbz`/`tbnz`, top byte `0x34`–`0x37` or `0xb4`–`0xb7`).
+
+The structural scanner used for unknown versions matches the AuthDevice
+getter shape, so on 3.35.3 it finds a third site of the same family
 (`canDeviceSetting`, `0xc4afcc`) and force-trues it too — harmless, since that
 is also the app's own empty-list behaviour and the flag is usually true
-anyway.
+anyway. The scanner has no signature for the log-tab guard; that site only
+comes from the built-in table or the config file.
 
 Because homehub ships with `extractNativeLibs="false"`, `libapp.so` is never
 unpacked: the module finds it inside `split_config.arm64_v8a.apk` by parsing

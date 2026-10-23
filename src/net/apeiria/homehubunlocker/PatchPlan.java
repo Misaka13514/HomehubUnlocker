@@ -24,10 +24,14 @@ import org.json.JSONObject;
  * in CONTRIBUTING.md, "The permission getters in detail".) This class produces
  * the vaddrs of the guard branches to NOP:
  *
- *   1. explicit offsets from the config file (preferred, see README),
+ *   1. explicit offsets from the config file (preferred, see README — note the
+ *      config REPLACES the built-in table entirely when it resolves, so a
+ *      stale config on the device shadows new built-in entries),
  *   2. a built-in table for known app versions,
  *   3. a structural signature scan over the executable segment (best effort,
  *      survives register re-allocation and immediate drift between builds).
+ *      The scan only recognizes the AuthDevice getter family; the log-tab
+ *      guard has no signature and must come from (1) or (2).
  */
 final class PatchPlan {
 
@@ -40,9 +44,12 @@ final class PatchPlan {
      *   canNfcSetting      @ 0x74f7dc, guard cbnz @ +0x48
      *   canPasscodeSetting @ 0x754358, guard cbnz @ +0x11c (the second length
      *   check; the first one selects a device-type fallback instead)
+     *   log tab            @ DeviceDetailView.build, guard tbnz w0,#4 @
+     *   0xc82a9c right after the showLogTab() call; NOP-ing it always adds the
+     *   出入り履歴 tab (the logs endpoint is not enforced server-side).
      */
     private static final String BUILTIN_VERSION = "3.35.3";
-    private static final long[] BUILTIN_OFFSETS = {0x74f824L, 0x754474L};
+    private static final long[] BUILTIN_OFFSETS = {0x74f824L, 0x754474L, 0xc82a9cL};
 
     private PatchPlan() {}
 
